@@ -4,52 +4,59 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import httpx
-import os
 import time
 import uuid
-from dotenv import load_dotenv
 import logging
 from datetime import datetime
 import asyncio
 from contextlib import asynccontextmanager
 import json
+from src.config import (
+    API_KEY,
+    LLM_API_BASE_URL,
+    FASTAPI_HOST,
+    FASTAPI_PORT,
+    API_TIMEOUT,
+    API_MAX_RETRIES,
+    API_RETRY_DELAY,
+    LOG_LEVEL,
+    LOG_DIR,
+    CORS_ORIGINS,
+    validate_config
+)
+import os
 
-# ✅ 로그 설정 개선
+# 로그 디렉토리 생성
+os.makedirs(LOG_DIR, exist_ok=True)
+
+# 로그 설정
 logging.basicConfig(
-    level=logging.INFO, 
+    level=getattr(logging, LOG_LEVEL),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('fastapi_server.log'),
+        logging.FileHandler(f'{LOG_DIR}/fastapi_server.log'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
-# ✅ .env 로딩
-env_loaded = load_dotenv()
-logger.info(f".env 파일 로딩 여부: {env_loaded}")
-
-# ✅ API_KEY 확인 및 검증
-API_KEY = os.getenv("API_KEY")
-if not API_KEY:
-    logger.error("❌ API_KEY가 설정되지 않았습니다!")
-    raise ValueError("API_KEY 환경변수가 필요합니다.")
-
-# SKT API 기본 설정
-SKT_API_BASE_URL = "https://aihub-api.sktelecom.com/aihub/v2/sandbox/chat/completions"
-DEFAULT_TIMEOUT = 30
-MAX_RETRIES = 3
-RETRY_DELAY = 1
+# 설정 검증
+try:
+    validate_config()
+    logger.info("✅ 설정 검증 완료")
+except ValueError as e:
+    logger.error(f"❌ 설정 오류: {e}")
+    raise
 
 # HTTP 클라이언트 설정
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 시작 시 HTTP 클라이언트 생성
     app.state.http_client = httpx.AsyncClient(
-        timeout=httpx.Timeout(DEFAULT_TIMEOUT),
+        timeout=httpx.Timeout(API_TIMEOUT),
         limits=httpx.Limits(max_keepalive_connections=10, max_connections=100)
     )
-    logger.info("FastAPI 서버가 시작되었습니다.")
+    logger.info(f"FastAPI 서버가 시작되었습니다. (포트: {FASTAPI_PORT})")
     yield
     # 종료 시 HTTP 클라이언트 정리
     await app.state.http_client.aclose()
@@ -57,8 +64,8 @@ async def lifespan(app: FastAPI):
 
 # FastAPI 앱 생성
 app = FastAPI(
-    title="MI Project Chat API",
-    description="SKT AI Hub API를 프록시하는 채팅 API 서버",
+    title="Isolated Chat API",
+    description="폐쇄망 환경을 위한 LLM 프록시 채팅 API 서버",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -66,7 +73,7 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 프로덕션에서는 구체적인 도메인 지정
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -100,30 +107,23 @@ request_count = 0
 error_count = 0
 total_response_time = 0.0
 
-# 유틸리티 함수들
-def generate_chat_id() -> str:
-    """고유한 채팅 ID 생성"""
-    return f"chatcmpl-{uuid.uuid4().hex[:8]}"
+# 유틸리티 함수 import
+from src.utils import generate_chat_id, validate_model
 
-def validate_model(model: str) -> bool:
-    """지원하는 모델인지 확인"""
-    supported_models = ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4"]
-    return model in supported_models
-
-async def call_skt_api_with_retry(client: httpx.AsyncClient, payload: dict, retries: int = MAX_RETRIES) -> dict:
-    """재시도 로직이 포함된 SKT API 호출"""
+async def call_llm_api_with_retry(client: httpx.AsyncClient, payload: dict, retries: int = API_MAX_RETRIES) -> dict:
+    """재시도 로직이 포함된 LLM API 호출"""
     last_exception = None
-    
+
     for attempt in range(retries):
         try:
-            logger.info(f"SKT API 호출 시도 {attempt + 1}/{retries}")
-            
+            logger.info(f"LLM API 호출 시도 {attempt + 1}/{retries}")
+
             response = await client.post(
-                SKT_API_BASE_URL,
+                LLM_API_BASE_URL,
                 headers={
                     "Authorization": API_KEY,
                     "Content-Type": "application/json",
-                    "User-Agent": "MI-Project-Chat-API/1.0"
+                    "User-Agent": "Isolated-Chat/1.0"
                 },
                 json=payload
             )
@@ -131,28 +131,28 @@ async def call_skt_api_with_retry(client: httpx.AsyncClient, payload: dict, retr
             response.raise_for_status()
             result = response.json()
             
-            logger.info(f"SKT API 호출 성공 (시도 {attempt + 1})")
+            logger.info(f"LLM API 호출 성공 (시도 {attempt + 1})")
             return result
-            
+
         except httpx.TimeoutException as e:
             last_exception = e
-            logger.warning(f"SKT API 타임아웃 (시도 {attempt + 1}/{retries}): {e}")
-            
+            logger.warning(f"LLM API 타임아웃 (시도 {attempt + 1}/{retries}): {e}")
+
         except httpx.HTTPStatusError as e:
             last_exception = e
-            logger.error(f"SKT API HTTP 오류 (시도 {attempt + 1}/{retries}): {e.response.status_code} - {e.response.text}")
-            
+            logger.error(f"LLM API HTTP 오류 (시도 {attempt + 1}/{retries}): {e.response.status_code} - {e.response.text}")
+
             # 4xx 에러는 재시도하지 않음
             if 400 <= e.response.status_code < 500:
                 break
-                
+
         except Exception as e:
             last_exception = e
-            logger.error(f"SKT API 호출 오류 (시도 {attempt + 1}/{retries}): {e}")
-        
+            logger.error(f"LLM API 호출 오류 (시도 {attempt + 1}/{retries}): {e}")
+
         # 마지막 시도가 아니면 잠시 대기
         if attempt < retries - 1:
-            await asyncio.sleep(RETRY_DELAY * (attempt + 1))
+            await asyncio.sleep(API_RETRY_DELAY * (attempt + 1))
     
     # 모든 재시도 실패
     raise last_exception
@@ -279,21 +279,21 @@ async def chat_completion(req: ChatCompletionRequest):
             detail="서버 내부 오류가 발생했습니다."
         )
 
-async def handle_normal_response(skt_payload: dict, model: str) -> ChatCompletionResponse:
+async def handle_normal_response(llm_payload: dict, model: str) -> ChatCompletionResponse:
     """일반 응답 처리"""
-    skt_data = await call_skt_api_with_retry(app.state.http_client, skt_payload)
+    llm_data = await call_llm_api_with_retry(app.state.http_client, llm_payload)
     
     # 응답 데이터 추출
-    choices = skt_data.get("choices", [])
+    choices = llm_data.get("choices", [])
     if not choices:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="SKT API에서 유효한 응답을 받지 못했습니다."
+            detail="LLM API에서 유효한 응답을 받지 못했습니다."
         )
-    
+
     reply_content = choices[0].get("message", {}).get("content", "")
     if not reply_content:
-        logger.warning("SKT API 응답이 비어있습니다.")
+        logger.warning("LLM API 응답이 비어있습니다.")
         reply_content = "죄송합니다. 응답을 생성할 수 없습니다."
     
     # OpenAI 호환 응답 포맷 구성
@@ -312,33 +312,33 @@ async def handle_normal_response(skt_payload: dict, model: str) -> ChatCompletio
                 "finish_reason": choices[0].get("finish_reason", "stop")
             }
         ],
-        "usage": skt_data.get("usage", {
-            "prompt_tokens": sum(len(str(m.get("content", "")).split()) for m in skt_payload.get("messages", [])),
+        "usage": llm_data.get("usage", {
+            "prompt_tokens": sum(len(str(m.get("content", "")).split()) for m in llm_payload.get("messages", [])),
             "completion_tokens": len(reply_content.split()),
-            "total_tokens": sum(len(str(m.get("content", "")).split()) for m in skt_payload.get("messages", [])) + len(reply_content.split())
+            "total_tokens": sum(len(str(m.get("content", "")).split()) for m in llm_payload.get("messages", [])) + len(reply_content.split())
         })
     }
     
     logger.info(f"채팅 응답 성공: 토큰 수={len(reply_content)}")
     return response_data
 
-async def stream_chat_response(skt_payload: dict, model: str):
+async def stream_chat_response(llm_payload: dict, model: str):
     """스트리밍 응답 처리"""
     chat_id = generate_chat_id()
     created = int(time.time())
-    
+
     try:
-        # SKT API에 스트리밍 요청
+        # LLM API에 스트리밍 요청
         async with httpx.AsyncClient(timeout=httpx.Timeout(60.0)) as client:
             async with client.stream(
                 "POST",
-                SKT_API_BASE_URL,
+                LLM_API_BASE_URL,
                 headers={
                     "Authorization": API_KEY,
                     "Content-Type": "application/json",
-                    "User-Agent": "MI-Project-Chat-API/1.0"
+                    "User-Agent": "Isolated-Chat/1.0"
                 },
-                json=skt_payload
+                json=llm_payload
             ) as response:
                 
                 response.raise_for_status()
@@ -427,4 +427,7 @@ start_time = time.time()
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9393, log_level="info")
+    from src.config import print_config
+
+    print_config()
+    uvicorn.run(app, host=FASTAPI_HOST, port=FASTAPI_PORT, log_level=LOG_LEVEL.lower())

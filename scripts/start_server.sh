@@ -23,7 +23,7 @@ echo "🚀 FastAPI 서버 시작: $(date)"
 echo "📄 로그 파일: $LOG_FILE"
 
 # ▶️ 백그라운드 실행 (stdout+stderr를 로그파일에 저장)
-nohup uvicorn fastapi_server:app --host 0.0.0.0 --port 9393 --reload >> "$LOG_FILE" 2>&1 &
+nohup uvicorn src.server:app --host 0.0.0.0 --port 9393 --reload >> "$LOG_FILE" 2>&1 &
 
 # ▶️ PID 저장
 echo $! > "$PID_FILE"

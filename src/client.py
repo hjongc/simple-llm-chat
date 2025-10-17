@@ -36,7 +36,7 @@ FORMATTING:
 Remember: You are helping with MI project tasks, so prioritize accuracy, clarity, and practical applicability in your responses."""
 
 # LLM 서버 호출 함수 (재사용용)
-def chat_with_api(message, server_url="http://150.6.15.80/v1/chat/completions", model_name="gpt-4o", timeout=60, temperature=0.7, max_tokens=4096):
+def chat_with_api(message, server_url="http://localhost:9393/v1/chat/completions", model_name="gpt-4o", timeout=60, temperature=0.7, max_tokens=4096):
     """
     LLM 서버에 단일 메시지를 보내고 응답을 받는다.
     :param message: 사용자 메시지
@@ -71,7 +71,7 @@ def chat_with_api(message, server_url="http://150.6.15.80/v1/chat/completions", 
         return "[오류] 서버 응답 실패"
 
 # 대화 맥락을 포함한 고급 채팅 함수
-def chat_with_context(message, conversation_history=None, server_url="http://150.6.15.80/v1/chat/completions", model_name="gpt-4o", timeout=60, temperature=0.7, max_tokens=2048):
+def chat_with_context(message, conversation_history=None, server_url="http://localhost:9393/v1/chat/completions", model_name="gpt-4o", timeout=60, temperature=0.7, max_tokens=2048):
     """
     대화 맥락을 포함하여 LLM 서버에 요청을 보낸다.
     :param message: 현재 사용자 메시지

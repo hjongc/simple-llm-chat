@@ -21,8 +21,8 @@ if [ -f "$PID_FILE" ]; then
 fi
 
 # 백그라운드 실행
-echo "🚀 MI Project Agent (chat_app.py)를 9191 포트에서 백그라운드 실행 중..."
-nohup streamlit run chat_app.py --server.port 9191 --server.headless true > "$LOG_FILE" 2>&1 &
+echo "🚀 Isolated Chat (app.py)를 9191 포트에서 백그라운드 실행 중..."
+nohup streamlit run src/app.py --server.port 9191 --server.headless true > "$LOG_FILE" 2>&1 &
 
 # PID 저장
 echo $! > "$PID_FILE"

@@ -4,7 +4,7 @@ import logging
 import json
 import uuid
 from datetime import datetime
-from llm_client import chat_with_context, chat_with_context_stream
+from src.client import chat_with_context, chat_with_context_stream
 
 # 서버 설정
 SERVER_CHAT_API = "http://localhost:9393/v1/chat/completions"
@@ -101,8 +101,8 @@ def handle_chat_submission(prompt):
 
 # 페이지 기본 설정
 st.set_page_config(
-    page_title="MI Project Agent", 
-    page_icon="🤖", 
+    page_title="Isolated Chat",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -166,46 +166,46 @@ function copyToClipboard(text) {
 # 헤더
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    st.markdown("<h1 style='text-align: center; margin-bottom: 1rem;'>🤖 MI Project Agent</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; margin-bottom: 1rem;'>🤖 Isolated Chat</h1>", unsafe_allow_html=True)
 
 # 환영 페이지
 if st.session_state.show_welcome and not st.session_state.chat_history:
     st.markdown("""
     <div class="welcome-container">
-        <h2>👋 안녕하세요! MI Project Agent입니다</h2>
-        <p>MI 프로젝트와 IT 인프라 관련 전문 상담을 도와드립니다</p>
+        <h2>👋 안녕하세요! Isolated Chat입니다</h2>
+        <p>폐쇄망 환경에서 안전하게 LLM을 활용한 대화를 시작하세요</p>
         <br>
         <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;">
             <div style="text-align: center;">
-                <div style="font-size: 2rem;">🗄️</div>
-                <strong>데이터베이스</strong><br>
-                <small>Oracle, SQL Server, MySQL 관리</small>
+                <div style="font-size: 2rem;">🔒</div>
+                <strong>보안</strong><br>
+                <small>폐쇄망 내부 환경</small>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 2rem;">⚙️</div>
-                <strong>Control-M</strong><br>
-                <small>작업 스케줄링 및 자동화</small>
+                <div style="font-size: 2rem;">⚡</div>
+                <strong>빠른 응답</strong><br>
+                <small>실시간 스트리밍</small>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 2rem;">📊</div>
-                <strong>MSTR 분석</strong><br>
-                <small>리포트 설계 및 최적화</small>
+                <div style="font-size: 2rem;">💡</div>
+                <strong>다양한 활용</strong><br>
+                <small>질문, 분석, 작성</small>
             </div>
             <div style="text-align: center;">
-                <div style="font-size: 2rem;">🔧</div>
-                <strong>시스템 관리</strong><br>
-                <small>서버 및 네트워크 관리</small>
+                <div style="font-size: 2rem;">🎯</div>
+                <strong>맥락 이해</strong><br>
+                <small>대화 기억 유지</small>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-    
+
     st.markdown("### 💬 질문을 입력하여 대화를 시작하세요")
     st.markdown("**예시 질문:**")
-    st.markdown("- MSTR 리포트 설계 방법을 알려주세요")
-    st.markdown("- Oracle 데이터베이스 성능 최적화 방법")
-    st.markdown("- Control-M 작업 스케줄링 설정 방법")
-    st.markdown("- SQL 쿼리 튜닝 팁")
+    st.markdown("- 코드 리뷰 및 개선 방법 제안")
+    st.markdown("- 데이터 분석 및 인사이트 도출")
+    st.markdown("- 문서 작성 및 번역")
+    st.markdown("- 기술적 문제 해결 방법")
 
 # 사이드바 설정
 with st.sidebar:
